@@ -32,7 +32,29 @@ update_use 'dev-lang/php' '+bcmath' '+calendar' '+cli' '+ctype' '+curl' '+exif' 
            '+xmlrpc' '+xmlwriter' '+xpm' '+xslt' '+zip'
 ```
 
-When a Kubler build process is started, the build container is prepared in case it doesn't exist yet, and the latest version of the `Portage Tree` is downloaded. At this point the container is ready for instructions on how to build a docker image. The instructions for the latter come from the `build.sh` script that can be found in the configuration folder of each image, under the `images` directory. This script specifies the packages that need to be installed, changes that are to be made before building, and those that need to be applied after building. Packages are installed to an `${_EMERGE_ROOT}` directory on the build container, and at the end of the process they are added to an archive (`rootfs.tar`) that contains the files and folders for the docker image. The `Dockerfile` that can also be found in each image directory (or a template to generate it, named `Dockerfile.template`) then takes care of adding the files and folders in the `rootfs.tar` archive to the docker image, and the image is ready.
+When a Kubler build process is started, the build container is prepared in case it doesn't exist yet, and the latest version of the `Portage Tree` is downloaded. At this point the container is ready for instructions on how to build a docker image. These instructions come from the `build.sh` script that can be found in the configuration folder of each image, under the `images` directory. This script specifies the packages that need to be installed, changes that are to be made before building, and those that need to be applied after building. Packages are installed to an `${_EMERGE_ROOT}` directory on the build container, and at the end of the process they are added to an archive (`rootfs.tar`) containing the files and folders for the docker image. The `Dockerfile`, which can also be found in each image directory (or a template to generate it, named `Dockerfile.template`) then takes care of adding the files and folders in the `rootfs.tar` archive to the docker image. At this point the image is ready for use with Docker.
+
+Kubler build scripts and stored in a so-called `namespace` which corresponds to the directory containing the `builder` and `images` folders. The content of this repository is thus a single namespace. Multiple namespaces can have different builders and configurations, and when a `kubler` command is executed inside a namespace folder it picks up the configuration file (if any) in that folder and references the `images` folder for that namespace.
+
+# USING KUBLER
+
+Kubler downloads an archive containing a kind of minimal Gentoo operating system (referred to as a `stage3` archive) to create its build container (`bob`). This archive is hosted on Gentoo's (mirror) servers and regularly updated. The `kubler update` command makes sure Kubler has the name of the latest stage3 archive and is therefore best executed before building any images. It also takes care of updating the `Portage` tree (containing `ebuild` scripts) which is stored in a separate container. 
+
+```
+kubler update
+```
+
+Starting the actual build process of an image is rather simple, just execute `kubler build` followed by the name of the image as it appears in the `images` directory.
+
+```
+kubler build busybox
+```
+
+As building images can be quite time-consuming, kubler will try to avoid building images for which the result is already available (the `rootfs.tar` archive). Sometimes it's necessary to start from scratch and remove these so-called build `artifacts`, for example when making changes to the build script. The `kubler clean` command can take care of removing these.
+
+```
+kubler clean
+```
 
 [devdocs]: https://devdocs.magento.com/guides/v2.4/install-gde/system-requirements.html
 [docker]: https://docs.docker.com/get-started/overview/
