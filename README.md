@@ -9,8 +9,8 @@ Building images require both `Docker` and `Kubler` to be installed, which on an 
 ```
 mkdir /docker
 cd /docker
-git clone https://github.com/inatic/magento2-kubler-images
-cd magento2-kubler-images
+git clone https://github.com/inatic/magento2-kubler-images inatic
+cd inatic
 sh docker-install.sh
 sh kubler-install.sh
 ```
@@ -44,17 +44,18 @@ Kubler downloads an archive containing a kind of minimal Gentoo operating system
 kubler update
 ```
 
+As building images can be quite time-consuming, kubler will try to avoid building images for which the result is already available (the `rootfs.tar` archive). Sometimes it's necessary to start from scratch and remove these so-called build `artifacts`, for example when making changes to the build script. The `kubler clean` command can take care of removing these.
+
+```
+kubler clean
+```
+
 Starting the actual build process of an image is rather simple, just execute `kubler build` followed by the name of the image as it appears in the `images` directory.
 
 ```
 kubler build busybox
 ```
 
-As building images can be quite time-consuming, kubler will try to avoid building images for which the result is already available (the `rootfs.tar` archive). Sometimes it's necessary to start from scratch and remove these so-called build `artifacts`, for example when making changes to the build script. The `kubler clean` command can take care of removing these.
-
-```
-kubler clean
-```
 
 [devdocs]: https://devdocs.magento.com/guides/v2.4/install-gde/system-requirements.html
 [docker]: https://docs.docker.com/get-started/overview/
