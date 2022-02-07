@@ -6,7 +6,7 @@ This is the advantage offered by packaging components in [Docker][docker] images
 # RESOURCES
 
 * [devdocs]: https://devdocs.magento.com/guides/v2.4/install-gde/system-requirements.html
-* [docker]: https://docs.docker.com/get-started/overview/)
-* [dockerhub]: https://hub.docker.com/)
-* [kubler]: https://github.com/edannenberg/kubler)
-* [gentoo]: https://www.gentoo.org/)
+* [docker]: https://docs.docker.com/get-started/overview/
+* [dockerhub]: https://hub.docker.com/
+* [kubler]: https://github.com/edannenberg/kubler
+* [gentoo]: https://www.gentoo.org/
