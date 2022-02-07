@@ -15,9 +15,29 @@ sh docker-install.sh
 sh kubler-install.sh
 ```
 
+# BUILD PROCESS
+
+The process of building images using Kubler starts by creating a container based on the Gentoo operating system, and it is in this container that the files and folders for our images will be generated. The builder container fittingly has been named `bob` and its configuration script can be found under `builder/bob`. The `builder` directory in fact is just a straight copy from the original developer's [kubler-images][] repository on Github, and most of the scripts in the `images` directory are based on the examples in this repository, possibly with some modification for use with Magento2.
+
+Gentoo is a bit special compared to many other Linux distributions in that it builds packages from source code instead of fetching precompiled binaries from a server. It gets the instructions on how to build a package from `ebuild` scripts, an overview of which can be found at [packages.gentoo.org][packages.gentoo.org]. So, where the build container (`bob`) brings the first ingredient for making docker images, namely a functional toolchain, these `ebuilds` provide the instructions that have to be executed by the build container in order to generate the files and folders of a given software package. The `ebuilds` that can be found on Gentoo's website are also available from the so-called `Portage Tree`, which is nothing more than a collection of all the software title and version `ebuilds` that are available for Gentoo. `Portage` by the way is the build system used by Gentoo, and it's called a tree because `ebuilds` are hierarchically organized in folders by category.
+
+The main reason for compiling software from source code is the ability to include and leave out features according to requirements, and Gentoo offers this possiblity with so-called `USE flags`. These are options that can be set for and entire system (e.g. to leave out graphics capabilities on a server with the `-X` USE flag) or for each package separately. In the `build.sh` script of the PHP image, a list for example can be found of all the features that are added to the entire system and one for the options that are enabled specifically for the PHP service.
+
+```
+update_use '+gif' '+jpeg' '+jpeg2k' '+png' '+tiff' '+webp'
+
+update_use 'dev-lang/php' '+bcmath' '+calendar' '+cli' '+ctype' '+curl' '+exif' '+fpm' '+mhash' \
+           '+ftp' '+iconv' '+imap' '+intl' '+json' '+mhash' '+mysql' '+mysqli' '+nls' '+opcache' '+pcntl' \
+           '+pdo' '+simplexml' '+soap' '+sockets' '+sodium' '+ssl' '+truetype' '+wddx' '+webp' '+xml' '+xmlreader' \
+           '+xmlrpc' '+xmlwriter' '+xpm' '+xslt' '+zip'
+```
+
+When a Kubler build process is started, the build container is prepared in case it doesn't exist yet, and the latest version of the `Portage Tree` is downloaded. At this point the container is ready for instructions on how to build a docker image. The instructions for the latter come from the `build.sh` script that can be found in the configuration folder of each image, under the `images` directory. This script specifies the packages that need to be installed, changes that are to be made before building, and those that need to be applied after building. Packages are installed to an `${_EMERGE_ROOT}` directory on the build container, and at the end of the process they are added to an archive (`rootfs.tar`) that contains the files and folders for the docker image. The `Dockerfile` that can also be found in each image directory (or a template to generate it, named `Dockerfile.template`) then takes care of adding the files and folders in the `rootfs.tar` archive to the docker image, and the image is ready.
 
 [devdocs]: https://devdocs.magento.com/guides/v2.4/install-gde/system-requirements.html
 [docker]: https://docs.docker.com/get-started/overview/
 [dockerhub]: https://hub.docker.com/
 [kubler]: https://github.com/edannenberg/kubler
+[kubler-images]: https://github.com/edannenberg/kubler-images
 [gentoo]: https://www.gentoo.org/
+[packages.gentoo.org]: https://packages.gentoo.org
