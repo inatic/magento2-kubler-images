@@ -66,6 +66,18 @@ Starting the actual build process of an image is rather simple, just execute `ku
 kubler build busybox
 ```
 
+# PUSHING IMAGES TO DOCKERHUB
+
+[Dockerhub][dockerhub] is a repository for storing images and the default place for Docker to go looking if an image is not available on the current system. It is quite practical to configure and build images on one server, then push them to dockerhub for safe keeping and easy access by other servers. Gentoo has a rolling release model, in which new packages become available and old packages (that might have bugs or unresolved security issues) are taken out of circulation. After some time it becomes difficult to build older versions of software packages; version 7.3.32 of PHP for example is the oldest supported version from [packages.gentoo.org][] at the time of writing. You should be keeping up to date with new version and avoid flawed versions anyway, so this probably is a good thing. Sometimes, however, it can come in quite handy to just fetch an old image from DockerHub and do whatever experimentation you have in mind. It is possible to get old versions of the *Portage Tree* and build from those, but depending on how old they are this can be a pain.
+
+Some of the images in this repository (like `bash` and `busybox`) are only created as parents of other images and never needed by Magento2 themselves. The images that are needed by Magento2 are listed below, and only these will be pushed to DockerHub. For other images like `varnish` the officially released version is used, thhis also is available from DockerHub.
+
+* nginx
+* letsencrypt
+* nginx-php
+* mariadb
+* redis
+* elasticsearch 
 
 [devdocs]: https://devdocs.magento.com/guides/v2.4/install-gde/system-requirements.html
 [docker]: https://docs.docker.com/get-started/overview/
