@@ -1,0 +1,7 @@
+#!/bin/sh
+
+chmod 0640 /etc/nullmailer/remotes
+chown root:nullmail /etc/nullmailer/*
+
+exec 2>&1
+exec setuidgid nullmail /usr/sbin/nullmailer-send

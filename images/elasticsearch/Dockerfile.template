@@ -1,0 +1,19 @@
+FROM ${IMAGE_PARENT}
+LABEL maintainer="${MAINTAINER}"
+
+ADD rootfs.tar /
+
+ADD etc /etc
+
+ENV ES_CLASSPATH /usr/share/elasticsearch/lib/*
+
+RUN chown -R elasticsearch:elasticsearch /etc/elasticsearch && \
+    chmod +x $(find /etc/service -name run) && \
+    ln -s /etc/s6_finish_default /etc/service/elasticsearch/finish && \
+    ln -s /etc/service/elasticsearch /service
+
+EXPOSE 9200 9300
+
+HEALTHCHECK --interval=30s --timeout=5s CMD curl -f http://localhost:9200
+
+CMD ["/bin/s6-svscan", "-t0", "/service"]

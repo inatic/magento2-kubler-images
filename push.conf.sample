@@ -1,0 +1,3 @@
+DOCKER_LOGIN=myacc
+DOCKER_PW=mypassword
+#DOCKER_EMAIL=foo@bar.net

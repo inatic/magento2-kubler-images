@@ -1,0 +1,18 @@
+#!/bin/sh
+
+chown -R magento:magento /home/magento
+DIR=/entrypoint/php-fpm
+echo "configuring the container..."
+if [[ -d "$DIR" ]]
+then
+    chmod +x ${DIR}/*
+    /bin/run-parts --verbose "$DIR"
+fi
+
+echo "php-fpm: waiting for nginx to start.."
+until ps -a | grep -q '[n]ginx: master'; do
+    sleep 1
+done
+
+exec 2>&1
+exec /usr/bin/php-fpm"${PHP_SLOT}" -y /etc/php/fpm-php"${PHP_SLOT}"/php-fpm.conf -F

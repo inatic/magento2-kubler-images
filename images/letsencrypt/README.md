@@ -1,0 +1,140 @@
+[Let's Encrypt][letsencrypt] is a free and automated certificate authority for generating SSL certificates. These are used to validate that a server is the legitimate destination of a domain name, so if you browse to for example `linux.org` the certificate will affirm that the server on the other end indeed belongs with the domain name.
+
+Before going over how certificates are generated, it is worthwhile to understand how they use `public key cryptography` to perform their magic. In public key cryptography each user has a private and a public key, and two main principles determine how these are used: a message **signed** with the private key of a user can be authenticated with the public key of that user, and a message **encrypted** with the public key of a user can only be decrypted with the private key of that user. In the context of our certificates, a certificate authority like LetsEncrypt signs the certificate of a domain with its private key, and makes its public key available to all browsers. When downloading a certificate from a server, any browser can thus verify if a certificate was indeed signed by the authority in question. At this point the browser can be sufficiently sure that the server belongs with the domain name it is visiting. The certificate contains the public key of the domain, and the browser uses this to encrypts a new secret key and sends it to the server. Only the server can decrypt this with the matching private key, and now both browser and server have the same secret key. They use this to encrypt traffic going over the internet, and a third person intercepting that communication will see no more than jibberish passing over the wire.
+
+# Getting a certificate
+
+Both new certificates and updates are handled by the same `update.sh` script that can be found in the `/etc/letsencrypt` directory. The script is executed by the unprivileged `letsencrypt` user and a `cron` job assures that it is executed at a regular interval. It expects to find a subfolder in the `/certificates` directory for each of the domains that need a certificate, and folders should be named after the domain in question (e.g. `example.com`). The script goes through each of the directories (`${dir}`) in this `/certificates` folder, prepares the prerequisites for the request and then asks LetsEncrypt to sign the certificate. Letsencrypt uses an automated system for these signing requests which it refers to as `acme` or *automated certificate management environment*. Interaction with this environment is provided by a client application, of which `certbot` is the default, though Daniel Roesler's more compact [ACME Tiny][acmetiny] client will be used in what follows.
+
+## Certificates directory
+
+The directory holding certificates is shared between the `letsencrypt` and the `nginx` server. The folder is stored on the host and mounted on both containers, for the `letsencrypt` container under `/certificates` and for the `nginx` container under `/etc/nginx/certs/`. A webserver configured to use SSL certificates needs these to be present or it will refuse to start. Therefore the `run` script of the `nginx` container will create temporary self-signed certificates for all domains in the `/certificates` folder that that don't yet have a domain certificate (`domain.crt`).
+
+## Permissions
+
+The `update.sh` script will create a number of sensitive keys and the certificates themselves, and these should only be written by the `letsencrypt` user. The `umask` command can be used to determine which permissions *not* to give to a new file or directory. When a new file is created on the system it by default gets the permission *666* (`rw-rw-rw-`) and for a directory that is *777* (`rwxrwxrwx`). The `umask` command would be set to 111 for masking execute permissions, 222 to mask write permissions, and 444 to mask read permission for all users. Here we want to mask write and execute permissions for both `group` and `others`, so the mask becomes *033*.  
+
+```
+umask 033
+```
+
+## Required files
+
+A number of files need to be prepared before asking LetsEncrypt to sign a certificate. First, each server contacting LetsEncrypt needs an account key (`account.key`) that uniquely identifies the submitter of the request. At this point we're creating this account key for each domain separately (probably all domains could share an account key).
+
+```
+openssl genpkey -algorithm rsa -pkeyopt rsa_keygen_bits:4096 -out ${dir}/account.key
+```
+
+It also requires a configuration file (`openssl.conf`) that holds the details of the certificate, in our case it contains a copy of the openssl configuration copied from `/etc/ssl/openssl.cnf` with the following couple of lines added at the end. The `${d}` variable expands to the domain name.
+
+```
+[SAN]
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.1 = ${d}
+DNS.2 = www.${d}
+```
+
+In public key cryptography the domain key (`domain.key`) would be referred to as the private key for the domain. This was already generated by the `run` script of the `nginx` container. The domain key in conjunction with above configuration file are used to create a so-called certificate signing request (`domain.csr`). The previous steps of creating account key, configuration and certificate signing request are only needed at the first time going through the script, afterwards these files can be reused for each request.
+
+```
+openssl req -new -sha256 -key ${dir}/domain.key -subj "/" -reqexts SAN -config ${dir}/openssl.cnf > ${dir}/domain.csr
+```
+
+## Challenge
+
+The client application runs on your server and requests a certificate from Letsencrypt for a certain domain. Upon receiving this request, Letsencrypt needs to make sure the server from which the request came indeed matches the domain in the (certificate signing) request. To check if this is the case Letsencrypt sends a small message (known as a `challenge`) to the acme client, which the latter puts in a folder of choice (here `/challenge`). This folder is implemented as a docker volume and mounted on the `nginx` container under `/var/www/.well-known/acme-challenge/` where it is picked up by the webserver. The LetsEncrypt authority then tries to fetch this challenge from the webserver and if successful returns the signed certificate to the acme client.
+
+```
+server {
+  listen 80;
+  listen [::]:80;
+  server_name yourdomain.com;
+
+  location /.well-known/acme-challenge/ {
+    alias /var/www/.well-known/acme-challenge/;
+    try_files $uri =404;
+    }
+
+  location / {
+    return 301 https://yourdomain.com$request_uri;
+    }
+}
+```
+
+You can place a test file in the folder to verify if nginx was configured correctly.
+
+```
+echo "test123" > /var/www/.well-known/acme-challenge/test.txt
+wget http://yourdomain.com/.well-known/acme-challenge/test.txt
+rm /var/www/.well-known/acme-challenge/test.txt
+```
+
+## Signing request
+The request to LetsEncrypt uses the `acme_tiny` tool and is very straightforward. It accepts the account key (`account.key`) that identifies the submitter of the request, a certificate signing request (`domain.csr`) for the domain in question, and a directory in which a challenge is saved (`/challenge`). It returns the signed request.
+
+```
+python /usr/bin/acme-tiny/acme_tiny.py --account-key ${dir}/account.key --csr ${dir}/domain.csr --acme-dir /challenge/ > ${dir}/signed.crt
+```
+
+## Verification
+
+The signed certificate is verified before passing it to the webserver. This is done by downloading the certificate of the entity that did the signing (LetsEncrypt `R3`), and verifying that if we trust the certificate of our signing authority, would we trust our certificate.
+
+```
+wget -O - https://letsencrypt.org/certs/lets-encrypt-r3.pem > /certificates/intermediate.pem
+status=$(openssl verify -CAfile /certificates/intermediate.pem ${dir}/signed.crt)
+```
+
+You can also have a look at the details of a certificate by use of the following commands:
+
+```
+openssl x509 -text -in domain.crt								# full text output
+openssl x509 -subject -issuer -dates -noout -in domain.crt		# only subject, issuer and validity dates
+```
+
+## Intermediate certificate
+
+It is not necessarily so that the authority doing the signing for LetsEncrypt (here `R3`) is trusted by the browser of a user, for this it needs to have access to and trust the LetsEncrypt signing authority certificate. This is where the concept of a [chain of trust][chainoftrust] comes into play. The browser might not trust our signing authority, but it might trust the root authority (here `ISRG Root X1`) that signed the certificate of the LetsEncrypt authority (`R3`). The browser needs to be made aware that the root authority signed the certificate of our authority, so the certificate of our authority (`R3`) is added to our certificate and thus the browser has access to the full chain of trust. Such a certificate that closes the chain of trust between a root certificate and our certificate is referred to as an *intermediate* certificate.
+
+```
+cat ${dir}/signed.crt /certificates/intermediate.pem > ${dir}/domain.crt
+```
+
+## Cron script
+The script is added to a cron file so it is executed on a regular basis, this from `Dockerfile.template`. 
+
+```
+RUN echo '# ---------- Refresh SSL certificates ----------' > /var/spool/cron/crontabs/letsencrypt && \
+    echo '# min  hour  mday  month  wday  command' >> /var/spool/cron/crontabs/letsencrypt && \ 
+    echo '5 3 15 * * /bin/sh /etc/letsencrypt/update.sh 2>> /etc/letsencrypt/update.log' >> /var/spool/cron/crontabs/letsencrypt && \
+    chmod 0644 /var/spool/cron/crontabs/letsencrypt
+```
+
+Set permissions on the cron script so it can only be executed by the owner which is `root`:
+
+```
+chmod 0644 /var/spool/cron/crontabs/letsencrypt
+```
+
+## Webserver restart
+
+The webserver needs to reload its configuration for it to pick up the new certificates, and then secure connections to the webserver can be established. This is also simply done with a periodic cron script that has the [s6-svc][s6svc] command send a `SIGHUP` signal to nginx. This change is done in `Dockerfile.template` on the nginx image.
+
+```
+RUN echo '# ---------- Refresh SSL certificates ----------' > /var/spool/cron/crontabs/root && \
+    echo '# min  hour  mday  month  wday  command' >> /var/spool/cron/crontabs/root && \ 
+    echo '0 0 * * 6 /bin/s6-svc -h /service/nginx/'  >> /var/spool/cron/crontabs/root && \
+    chmod 0644 /var/spool/cron/crontabs/root
+```
+
+[Python]: https://www.python.org/
+[Pip]: https://github.com/pypa/pip
+[acme-tiny]: https://github.com/diafygi/acme-tiny
+[letsencrypt]: https://letsencrypt.org/
+[chainoftrust]: https://letsencrypt.org/certificates/
+[s6svc]: https://skarnet.org/software/s6/s6-svc.html
+
+[packages]: PACKAGES.md
