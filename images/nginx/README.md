@@ -17,7 +17,7 @@ Add `ipv6` support, it's the future.
 update_use 'www-servers/nginx' '+http2 +ipv6'
 ```
 
-### Timeout
+## Timeout
 
 Certain Magento2 scripts need a bit longer to execute and nginx's timeout setting needs to be sufficiently high for them to terminate and send back their response. A likely symptom of connections timing out is that `Varnish` will be unable to get a response from nginx (and the Magento2 pages running PHP code) and will display a message saying the backend is unavailable. Magento sets the timeout for Varnish to be 600 seconds in the `default.vcl` configuration, so we'll go with the same value for nginx.
 
@@ -27,7 +27,7 @@ proxy_send_timeout 600;
 proxy_read_timeout 600;
 ```
 
-### Buffers
+## Buffers
 
 Nginx is positioned between the client (browser of the user) and the Magento2 installation. When it receive a response from Magento, this response is temporarily stored before sending back to the client. The response contains HTTP headers which are typically quite small, yet for Magento they can be big enough that the size of the buffer storing them needs to be increased. This is the buffer size that holds a single response, and if the buffer is full you will be presented with a *upstream sent too big header while reading response header from upstream* error message. Here the buffer value is doubled to 8k.
 
@@ -35,7 +35,7 @@ Nginx is positioned between the client (browser of the user) and the Magento2 in
 proxy_buffer_size 8k;
 ```
 
-### SSL Certificates
+## SSL Certificates
 
 Nginx is used as a proxy server for receiving and redirecting incoming traffic. For this it needs to terminate HTTPS requests and thus requires an SSL certificate for the domain. It needs this certificate at startup, but the LetsEncrypt request process needs a running webserver. To get around this chicken-and-egg problem, `nginx` generates self-signed certificates at startup for each of the domains in the `certs` directory. Once the webserver is running, the `letsencrypt` container can replace these self-signed certificates with some that are signed by a proper authority. Properties for generating temporary certificates can be fed into the container using environment variables, though it really doesn't make much difference what they are as long as the certificate works.
 
