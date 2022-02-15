@@ -13,6 +13,9 @@ RUN chmod +x $(find /etc/service -name run) && \
     ln -s /etc/service/cron /service && \
     ln -s /etc/nginx/ssl.conf /etc/nginx/conf.d/
 
+RUN echo '# Reload nginx configuration to pull in updated SSL certificates' > /var/spool/cron/crontabs/root
+RUN echo '0 0 * * 6 /bin/s6-svc -h /service/nginx/' >> /var/spool/cron/crontabs/root
+
 EXPOSE 80 443
 
 HEALTHCHECK --interval=30s --timeout=3s CMD wget --spider http://localhost || exit 1

@@ -63,8 +63,17 @@ for path in /etc/nginx/certs/*/ ; do
             -out /etc/nginx/certs/${d}/domain.ecc.crt
     fi
 done
-
 ```
+
+## Cron
+
+A `cron` job is added to reload the nginx configuration files once a week, this to use the new certificates if they have been updated. The cron job is created from `Dockerfile.template`.
+
+```Dockerfile.template
+RUN echo '# Reload nginx configuration to pull in updated SSL certificates' > /var/spool/cron/crontabs/root
+RUN echo '0 0 * * 6 /bin/s6-svc -h /service/nginx/' >> /var/spool/cron/crontabs/root
+``` 
+
 [Last Build][packages]
 
 [Nginx]: http://nginx.org/
