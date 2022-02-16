@@ -46,6 +46,13 @@ sed-or-die '^pm.min_spare_servers = 1' 'pm.min_spare_servers = 5' "${fpm_conf}"
 sed-or-die '^pm.max_spare_servers = 3' 'pm.max_spare_servers = 20' "${fpm_conf}"
 ```
 
+The paths to files accessed by PHP can be cached, avoiding the effort of looking through the filesystem each time a page is loaded. This cache is sized using the `realpath_cache` variable, which is increased from its default value to improve performance. The suggestion to make this change can be found in the [php settings][php-settings] page on Magento DevDocs.
+
+```
+sed-or-die '^;realpath_cache_size =.*' "realpath_cache_size = 10M" "${fpm_php_ini}"
+sed-or-die '^;realpath_cache_ttl =.*' "realpath_cache_ttl = 7200" "${fpm_php_ini}"
+```
+
 Requests to `php-fpm` are buffered into memory by the nginx webserver, and if the configured amount of memory runs out they are buffered on disk which is slower. The `fastcgi_buffer_size` configuration specifies how much memory is reserved for the HTTP header of each response, and the `fastcgi_buffers` option specifies how much memory is reserved for buffering response payloads. The first number in `fastcgi_buffers` is the number of segments and the second their size. The latter best corresponds to the system page size or a multiple of it. The page size of your system can be discovered by executing `getconf PAGESIZE` in the shell, it often is 4K, and so the following configuration reserves a total buffer size of 4MB. This configuration is currently also set in the `nginx.conf.sample` file used by Magento, so it might no longer be needed here.
 
 ```etc/nginx/php.conf

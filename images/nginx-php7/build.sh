@@ -74,6 +74,9 @@ finish_rootfs_build()
     fpm_php_ini="${_EMERGE_ROOT}"/etc/php/fpm-php"${_php_slot}"/php.ini
     # set php time zone
     sed-or-die '^;date.timezone =' "date.timezone = ${_php_timezone}" "${fpm_php_ini}"
+    # add space for storing file paths in cache
+    sed-or-die '^;realpath_cache_size =.*' "realpath_cache_size = 10M" "${fpm_php_ini}"
+    sed-or-die '^;realpath_cache_ttl =.*' "realpath_cache_ttl = 7200" "${fpm_php_ini}"
 
     # use above changes also for php cli config
     cp "${fpm_php_ini}" "${_EMERGE_ROOT}"/etc/php/cli-php"${_php_slot}"/php.ini
