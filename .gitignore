@@ -2,3 +2,4 @@ rootfs.tar
 Dockerfile
 push.conf
 PACKAGES.md
+*.swp
